@@ -1,6 +1,7 @@
 package wdlx;
 
 import net.minecraft.client.Minecraft;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import wdlx.world.WdlSession;
@@ -40,6 +41,10 @@ public class WorldDownloadManager {
 
     public DownloadStatus getStatus() {
         return status;
+    }
+
+    public @Nullable WdlSession getCurrentSession() {
+        return currentSession;
     }
 
     public enum DownloadStatus {

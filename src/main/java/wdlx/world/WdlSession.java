@@ -1,5 +1,6 @@
 package wdlx.world;
 
+import it.unimi.dsi.fastutil.longs.LongSet;
 import net.fabricmc.loader.api.FabricLoader;
 import net.lenni0451.lambdaevents.EventHandler;
 import net.minecraft.SharedConstants;
@@ -13,6 +14,7 @@ import net.minecraft.world.phys.AABB;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import wdlx.WorldDownloadX;
+import wdlx.api.Session;
 import wdlx.config.Config;
 import wdlx.events.ChunkUnloadEvent;
 import wdlx.events.EntityUnloadEvent;
@@ -24,8 +26,9 @@ import java.nio.file.Files;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Properties;
+import java.util.concurrent.CompletableFuture;
 
-public class WdlSession implements AutoCloseable {
+public class WdlSession implements AutoCloseable, Session {
     private static final Logger LOGGER = LoggerFactory.getLogger(WdlSession.class);
 
     final String name;
@@ -62,6 +65,46 @@ public class WdlSession implements AutoCloseable {
         this.wdlLevel = new WdlLevelManager(this, level);
         LOGGER.info("Started WdlSession: {}", name);
         Notifications.chat("WDL Started");
+    }
+
+
+    @Override
+    public synchronized void close() throws Exception {
+        WorldDownloadX.EVENT_BUS.unregister(this);
+        try {
+            flushLoadedChunks();
+            flushLoadedEntities();
+            writePlayerData();
+            writeLevelDat();
+            writeIcon();
+            writeWdlxMetadata();
+        } catch (Exception e) {
+            LOGGER.error("Failed to close WdlSession", e);
+            Notifications.chatError("Error while saving world: " + e.getMessage());
+        } finally {
+            if (this.wdlLevel != null) {
+                this.wdlLevel.close();
+                this.wdlLevel = null;
+            }
+
+            levelSourceAccess.close();
+        }
+
+        LOGGER.info("Closed WdlSession: {}", name);
+        Notifications.chat("WDL Saved!");
+    }
+
+    @Override
+    public boolean active() {
+        return wdlLevel != null;
+    }
+
+    // todo: consider calculating this at the start of the session, then just count++ for every additional chunk we save
+    // todo: consider api for reading saved chunks by dimension. so api consumers can query data in dimensions we're not in currently
+    // todo: consider a more efficient manifest datastore, like an sqlite db
+    @Override
+    public CompletableFuture<LongSet> savedChunks() {
+        return wdlLevel.chunkStorage.allSavedChunkPositions();
     }
 
     void flushLoadedChunks() {
@@ -121,32 +164,6 @@ public class WdlSession implements AutoCloseable {
             }
         }
         LOGGER.info("Flushed {} entities", count);
-    }
-
-    @Override
-    public synchronized void close() throws Exception {
-        WorldDownloadX.EVENT_BUS.unregister(this);
-        try {
-            flushLoadedChunks();
-            flushLoadedEntities();
-            writePlayerData();
-            writeLevelDat();
-            writeIcon();
-            writeWdlxMetadata();
-        } catch (Exception e) {
-            LOGGER.error("Failed to close WdlSession", e);
-            Notifications.chatError("Error while saving world: " + e.getMessage());
-        } finally {
-            if (this.wdlLevel != null) {
-                this.wdlLevel.close();
-                this.wdlLevel = null;
-            }
-
-            levelSourceAccess.close();
-        }
-
-        LOGGER.info("Closed WdlSession: {}", name);
-        Notifications.chat("WDL Saved!");
     }
 
     void writeLevelDat() {
@@ -217,6 +234,14 @@ public class WdlSession implements AutoCloseable {
         }
     }
 
+    /*
+     todo: we need to associate a set of entities to a chunk pos and this event is insufficient
+      edge cases:
+          - varying entity unload distances
+          - differentiate entity being killed and unloaded (we want to save unloaded)
+          - revisiting entities, need to identify by uuid and not dupe even when they moved chunks
+          - need to remove disk entity chunk if it previously had entities but now doesn't
+    */
     @EventHandler
     public void onEntityUnload(EntityUnloadEvent event) {
 

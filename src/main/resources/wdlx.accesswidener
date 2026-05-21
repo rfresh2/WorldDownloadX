@@ -3,3 +3,8 @@ transitive-accessible field net/minecraft/world/level/chunk/storage/ChunkSeriali
 transitive-accessible method net/minecraft/world/level/chunk/storage/ChunkSerializer makeBiomeCodec (Lnet/minecraft/core/Registry;)Lcom/mojang/serialization/Codec;
 transitive-accessible field net/minecraft/client/multiplayer/ClientPacketListener serverChunkRadius I
 transitive-accessible method net/minecraft/world/level/storage/LevelStorageSource$LevelStorageAccess saveLevelData (Lnet/minecraft/nbt/CompoundTag;)V
+transitive-accessible field net/minecraft/world/level/chunk/storage/SimpleRegionStorage worker Lnet/minecraft/world/level/chunk/storage/IOWorker;
+transitive-accessible field net/minecraft/world/level/chunk/storage/IOWorker storage Lnet/minecraft/world/level/chunk/storage/RegionFileStorage;
+transitive-accessible method net/minecraft/world/level/chunk/storage/IOWorker submitTask (Ljava/util/function/Supplier;)Ljava/util/concurrent/CompletableFuture;
+transitive-accessible field net/minecraft/world/level/chunk/storage/RegionFileStorage folder Ljava/nio/file/Path;
+transitive-accessible method net/minecraft/world/level/chunk/storage/RegionFileStorage getRegionFile (Lnet/minecraft/world/level/ChunkPos;)Lnet/minecraft/world/level/chunk/storage/RegionFile;
