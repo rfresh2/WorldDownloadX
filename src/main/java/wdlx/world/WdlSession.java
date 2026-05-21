@@ -13,6 +13,7 @@ import net.minecraft.world.phys.AABB;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import wdlx.WorldDownloadX;
+import wdlx.config.Config;
 import wdlx.events.ChunkUnloadEvent;
 import wdlx.events.EntityUnloadEvent;
 import wdlx.events.LevelChangeEvent;
@@ -90,6 +91,7 @@ public class WdlSession implements AutoCloseable {
     }
 
     void flushLoadedEntities() {
+        if (!Config.get().download.entities.enabled) return;
         var mc = Minecraft.getInstance();
         var level = mc.level;
         if (level == null) {

@@ -1,0 +1,23 @@
+{
+  "wdlx.config.title": "WorldDownloadX Settings",
+  "wdlx.config.download.category": "Download",
+  "wdlx.config.download.entities.group": "Entities",
+  "wdlx.config.download.entities.enabled": "Download Entities",
+  "wdlx.config.download.entities.freeze": "Freeze Entities",
+  "wdlx.config.download.player.group": "Player",
+  "wdlx.config.download.player.enabled": "Download Player",
+  "wdlx.config.download.player.censor": "Censor",
+  "wdlx.config.download.statistics.group": "Statistics",
+  "wdlx.config.download.statistics.enabled": "Download Statistics",
+  "wdlx.config.download.maps.group": "Maps",
+  "wdlx.config.download.maps.enabled": "Download Maps",
+  "wdlx.config.download.backup.group": "Backup",
+  "wdlx.config.download.backup.enabled": "Zip Backup",
+  "wdlx.config.debug.category": "Debug",
+  "wdlx.config.debug.logSettings": "Log Settings",
+  "wdlx.config.debug.logSavedChunks": "Log Saved Chunks",
+  "wdlx.config.debug.logSavedEntities": "Log Saved Entities",
+  "wdlx.config.debug.logSavedPlayers": "Log Saved Players",
+  "wdlx.config.debug.logSavedStatistics": "Log Saved Statistics",
+  "wdlx.config.debug.logSavedMaps": "Log Saved Maps"
+}

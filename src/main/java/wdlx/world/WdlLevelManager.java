@@ -8,6 +8,7 @@ import net.minecraft.nbt.NbtUtils;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.entity.ChunkEntities;
+import wdlx.config.Config;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -53,10 +54,12 @@ public class WdlLevelManager implements AutoCloseable {
         entities.getEntities().forEach(entity -> {
             CompoundTag nbt = new CompoundTag();
             if (entity.save(nbt)) {
-                nbt.putByte("NoAI", (byte) 1);
-                nbt.putByte("NoGravity", (byte) 1);
-                nbt.putByte("Invulnerable", (byte) 1);
-                nbt.putByte("Silent", (byte) 1);
+                if (Config.get().download.entities.freeze) {
+                    nbt.putByte("NoAI", (byte) 1);
+                    nbt.putByte("NoGravity", (byte) 1);
+                    nbt.putByte("Invulnerable", (byte) 1);
+                    nbt.putByte("Silent", (byte) 1);
+                }
                 listTag.add(nbt);
             }
         });
