@@ -1,6 +1,6 @@
 {
 	"schemaVersion": 1,
-	"id": "world-download-x",
+	"id": "wdlx",
 	"version": "${version}",
 	"name": "WorldDownloadX",
 	"description": "Download multiplayer worlds into a singleplayer world",
@@ -11,7 +11,7 @@
 		"sources": "https://github.com/rfresh2/WorldDownloadX"
 	},
 	"license": "LGPL-3.0",
-	"icon": "assets/world-download-x/icon.png",
+	"icon": "assets/wdlx/icon.png",
 	"environment": "*",
 	"entrypoints": {
 		"main": [
@@ -19,12 +19,11 @@
 		]
 	},
 	"mixins": [
-		"world-download-x.mixins.json"
+		"wdlx.mixins.json"
 	],
 	"depends": {
 		"fabricloader": ">=0.19.2",
-		"minecraft": "~1.21.1",
-		"java": ">=21",
+		"minecraft": ["1.21", "1.21.1"],
 		"fabric-api": "*"
 	}
 }

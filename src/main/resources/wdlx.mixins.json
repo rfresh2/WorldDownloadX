@@ -3,7 +3,10 @@
 	"package": "wdlx.mixin",
 	"compatibilityLevel": "JAVA_21",
 	"mixins": [
-
+		"ClientLevelMixin",
+		"ClientPacketListenerMixin",
+		"MinecraftMixin",
+		"PlayerDataStorageMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

@@ -18,10 +18,11 @@ java {
 repositories {}
 
 loom {
-	accessWidenerPath = file("src/main/resources/world-download-x.accesswidener")
+	accessWidenerPath = file("src/main/resources/wdlx.accesswidener")
 	runs {
 		getByName("client") {
 			client()
+			programArgs("--username", "test")
 		}
 	}
 }
@@ -31,6 +32,7 @@ dependencies {
 	mappings(loom.officialMojangMappings())
 	modImplementation("net.fabricmc:fabric-loader:$loader")
 	modImplementation("net.fabricmc.fabric-api:fabric-api:$fabricApi")
+	implementation(include("net.lenni0451:LambdaEvents:2.4.2")!!)
 }
 
 tasks {
