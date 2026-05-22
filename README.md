@@ -1,9 +1,22 @@
-# world-download-x
+# WorldDownloadX
 
-## Setup
+Download multiplayer Minecraft worlds into singleplayer worlds
 
-For setup instructions, please see the [Fabric Documentation page](https://docs.fabricmc.net/develop/getting-started/creating-a-project#setting-up) related to the IDE that you are using.
+## Usage
 
-## License
+### Commands
 
-This template is available under the CC0 license. Feel free to learn from it and incorporate it in your own projects.
+`wdlx:start <world_name>` - start WDL
+`wdlx:stop` - stop WDL
+
+## Local Development
+
+### Build
+
+`./gradlew build`
+
+the output jar will be at: `build/libs/WorldDownloadX-<version>.jar`
+
+### Local Dev Run
+
+`./gradlew run`
