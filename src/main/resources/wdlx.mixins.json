@@ -3,10 +3,12 @@
 	"package": "wdlx.mixin",
 	"compatibilityLevel": "JAVA_21",
 	"mixins": [
+		"ChunkMapMixin",
 		"ClientLevelMixin",
 		"ClientPacketListenerMixin",
 		"MinecraftMixin",
 		"PlayerDataStorageMixin",
+		"ServerLevelMixin",
 		"WorldOpenFlowsMixin"
 	],
 	"injectors": {

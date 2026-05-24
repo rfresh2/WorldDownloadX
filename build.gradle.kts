@@ -47,6 +47,9 @@ dependencies {
 
 	modImplementation("maven.modrinth:modmenu:$modmenu")
 	modImplementation("dev.isxander:yet-another-config-lib:$yacl+$mc-fabric")
+
+	compileOnly("org.projectlombok:lombok:1.18.46")
+	annotationProcessor("org.projectlombok:lombok:1.18.46")
 }
 
 tasks {
