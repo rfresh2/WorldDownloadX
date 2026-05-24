@@ -29,7 +29,7 @@ public class ChunkMapMixin {
                 new EmptyLevelChunk(
                     worldGenContext.level(),
                     chunk.getPos(),
-                    worldGenContext.level().registryAccess().registryOrThrow(Registries.BIOME).getHolder(0).get()
+                    worldGenContext.level().registryAccess().lookupOrThrow(Registries.BIOME).get(0).get()
                 )
             );
         }

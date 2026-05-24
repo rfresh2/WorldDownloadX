@@ -52,7 +52,7 @@ public abstract class ServerLevelMixin implements ServerLevelExt {
                     var clientSection = chunk.sections[i];
                     serverSections[i] = clientSection;
                 }
-                serverChunk.setUnsaved(true);
+                serverChunk.markUnsaved();
             });
         // todo: reconsider approach
         //  also need to handle entities & block entities & maybe biomes

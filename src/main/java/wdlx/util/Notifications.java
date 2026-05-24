@@ -27,7 +27,7 @@ public class Notifications {
 
     public static void toast(String message) {
         var mc = Minecraft.getInstance();
-        mc.execute(() -> mc.getToasts().addToast(
+        mc.execute(() -> mc.getToastManager().addToast(
             SystemToast.multiline(
                 mc,
                 SystemToast.SystemToastId.WORLD_BACKUP,

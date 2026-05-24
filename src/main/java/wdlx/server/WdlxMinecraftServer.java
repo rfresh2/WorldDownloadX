@@ -43,7 +43,7 @@ import java.util.List;
 public class WdlxMinecraftServer extends MinecraftServer {
     private static final Services NO_SERVICES = new Services(null, ServicesKeySet.EMPTY, null, null);
     private static final WorldOptions WORLD_OPTIONS = new WorldOptions(0L, false, false);
-    private static final GameRules TEST_GAME_RULES = Util.make(new GameRules(), gameRules -> {
+    private static final GameRules TEST_GAME_RULES = Util.make(new GameRules(FeatureFlags.VANILLA_SET), gameRules -> {
         gameRules.getRule(GameRules.RULE_DOMOBSPAWNING).set(false, null);
         gameRules.getRule(GameRules.RULE_WEATHER_CYCLE).set(false, null);
         gameRules.getRule(GameRules.RULE_RANDOMTICKING).set(0, null);
@@ -74,8 +74,8 @@ public class WdlxMinecraftServer extends MinecraftServer {
                         context -> {
                             Registry<LevelStem> registry = new MappedRegistry<>(Registries.LEVEL_STEM, Lifecycle.stable()).freeze();
                             WorldDimensions.Complete complete = context.datapackWorldgen()
-                                .registryOrThrow(Registries.WORLD_PRESET)
-                                .getHolderOrThrow(WorldPresets.FLAT)
+                                .lookupOrThrow(Registries.WORLD_PRESET)
+                                .getOrThrow(WorldPresets.FLAT)
                                 .value()
                                 .createWorldDimensions()
                                 .bake(registry);
