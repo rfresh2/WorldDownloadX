@@ -1,3 +1,31 @@
+### Server Data Packs
+
+capture packs sent by the server
+
+### Server Worlds
+
+when we initialize the world download server, we need to match the dimension config as sent by the external server
+
+currently it assumes vanilla dimensions
+
+### MultiWorld Helper
+
+if we download a multiworld, we should indicate to players how they can view the other worlds when they open the wdl in singleplayer
+
+### Metadata
+
+write a metadata file in the wdl directory after it completes
+
+with data like wdlx version, date, server ip, etc
+
+can be used for features like the MultiWorld Helper to identify if player is opening a wdlx download
+
+### Mod Compatibility
+
+test lithium, sodium, c2me, distant horizons, bobby, nvidium, replaymod, axiom, flashback, litematica
+
+test compat with mods that add custom dimensions, blocks, items, etc
+
 ### Entities
 
 edge cases that need testing:
@@ -119,4 +147,3 @@ set up project page on modrinth and curseforge
 - compare contents of wdl and test world
 
 can possibly use the fabric gametest api, or may need custom harness
-
