@@ -39,13 +39,30 @@ loom {
 	}
 }
 
+val libConfiguration by configurations.creating {
+	isTransitive = false
+}
+configurations.implementation.get().extendsFrom(libConfiguration)
+configurations.include.get().extendsFrom(libConfiguration)
+fun DependencyHandlerScope.lib(dependencyNotation: Any): Dependency? =
+	add("libConfiguration", dependencyNotation)?.also { (it as? ModuleDependency)?.isTransitive = false }
+fun DependencyHandlerScope.lib(
+	dependencyNotation: String,
+	dependencyConfiguration: ExternalModuleDependency.() -> Unit
+): Dependency? = add("libConfiguration", dependencyNotation)?.also {
+	val dependency = it as ExternalModuleDependency
+	dependency.isTransitive = false
+	dependency.dependencyConfiguration()
+}
+
 dependencies {
 	minecraft("com.mojang:minecraft:$mc")
 	mappings(loom.officialMojangMappings())
 	modImplementation("net.fabricmc:fabric-loader:$loader")
 	modImplementation("net.fabricmc.fabric-api:fabric-api:$fabricApi")
-	implementation(include("net.lenni0451:LambdaEvents:2.4.2")!!)
-	implementation(include("net.lenni0451:Reflect:1.6.3")!!)
+	lib("net.lenni0451:LambdaEvents:2.4.2")
+	lib("net.lenni0451:Reflect:1.6.3")
+	lib("net.lenni0451.commons:unchecked:1.9.2")
 
 	modImplementation("maven.modrinth:modmenu:$modmenu")
 	modImplementation("dev.isxander:yet-another-config-lib:$yacl+$mc-fabric")
