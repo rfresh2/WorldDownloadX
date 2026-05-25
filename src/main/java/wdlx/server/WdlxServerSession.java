@@ -12,6 +12,7 @@ import net.minecraft.server.network.CommonListenerCookie;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.world.level.storage.LevelResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import wdlx.WorldDownloadX;
@@ -22,7 +23,9 @@ import wdlx.events.EntityUnloadEvent;
 import wdlx.events.LevelChangeEvent;
 import wdlx.util.Notifications;
 
+import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -61,9 +64,43 @@ public class WdlxServerSession implements AutoCloseable, Session {
         server.executeBlocking(() -> {
             server.saveEverything(false, true, true);
         });
+        var worldPath = server.getWorldPath(LevelResource.ROOT);
         server.halt(true);
+        cleanupEmptyRegionFiles(worldPath);
         LOGGER.info("Stopped WdlServerSession");
         Notifications.chat("WDL Stopped");
+    }
+
+    void cleanupEmptyRegionFiles(Path worldPath) {
+        var count = new AtomicInteger();
+        try (var paths = Files.walk(worldPath)) {
+            paths
+                .filter(Files::isRegularFile)
+                .filter(path -> path.getFileName().toString().endsWith(".mca"))
+                .filter(this::isEmptyFile)
+                .forEach(path -> {
+                    try {
+                        Files.deleteIfExists(path);
+                        count.incrementAndGet();
+                    } catch (IOException e) {
+                        LOGGER.warn("Failed to delete empty region file {}", path, e);
+                    }
+                });
+        } catch (IOException e) {
+            LOGGER.warn("Failed to scan for empty region files in {}", worldPath, e);
+        }
+        if (count.get() > 0) {
+            LOGGER.info("Deleted {} empty region files", count.get());
+        }
+    }
+
+    boolean isEmptyFile(Path path) {
+        try {
+            return Files.size(path) == 0;
+        } catch (IOException e) {
+            LOGGER.warn("Failed to inspect region file {}", path, e);
+            return false;
+        }
     }
 
     // todo: should we create the player at the start of wdl? or at the closing?
@@ -93,13 +130,21 @@ public class WdlxServerSession implements AutoCloseable, Session {
     }
 
     void flushPlayer() {
+        if (!Config.get().download.player.enabled) return;
+        if (Config.get().debug.logSavedPlayers) {
+            LOGGER.info("Saving player: {} ({}) [{}, {}, {}]", mc.player.getGameProfile(), mc.player.getId(), mc.player.getX(), mc.player.getY(), mc.player.getZ());
+        }
         createPlayerDupe();
     }
 
     // todo: track which maps we encounter during the wdl and only flush those
     void flushMaps() {
+        if (!Config.get().download.maps.enabled) return;
         var clientMapData = mc.level.mapData;
         clientMapData.forEach((mapId, mapData) -> {
+            if (Config.get().debug.logSavedMaps) {
+                LOGGER.info("Saving map: {}", mapId.key());
+            }
             server.overworld().getDataStorage().set(mapId.key(), mapData);
         });
     }
@@ -142,18 +187,12 @@ public class WdlxServerSession implements AutoCloseable, Session {
 
     @EventHandler
     public void handleChunkUnload(ChunkUnloadEvent event) {
-        if (Config.get().debug.logSavedChunks) {
-            LOGGER.info("Saving chunk {}", event.chunk().getPos());
-        }
         server.writeClientChunk(event.chunk());
     }
 
     @EventHandler
     public void handleEntityUnload(EntityUnloadEvent event) {
         if (event.reason().shouldSave()) {
-            if (Config.get().debug.logSavedEntities) {
-                LOGGER.info("Saving entity {}", event.entity().getId());
-            }
             server.writeClientEntity(event.entity());
         }
     }

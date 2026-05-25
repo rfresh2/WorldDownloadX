@@ -52,7 +52,6 @@ public class Config {
 
         public static class Player {
             public boolean enabled = true;
-            public boolean censor = true;
         }
 
         public static class Statistics {
@@ -61,7 +60,6 @@ public class Config {
         }
 
         public static class Maps {
-            // todo: implement maps
             public boolean enabled = true;
         }
 
@@ -72,7 +70,6 @@ public class Config {
     }
 
     public static class Debug {
-        // todo: implement debug options
         public boolean logSettings = false;
         public boolean logSavedChunks = false;
         public boolean logSavedEntities = false;
@@ -106,11 +103,6 @@ public class Config {
                     .option(Option.<Boolean>createBuilder()
                         .name(Component.translatable("wdlx.config.download.player.enabled"))
                         .binding(defaultConfig.download.player.enabled, () -> Config.get().download.player.enabled, (value) -> Config.get().download.player.enabled = value)
-                        .controller(TickBoxControllerBuilder::create)
-                        .build())
-                    .option(Option.<Boolean>createBuilder()
-                        .name(Component.translatable("wdlx.config.download.player.censor"))
-                        .binding(defaultConfig.download.player.censor, () -> Config.get().download.player.censor, (value) -> Config.get().download.player.censor = value)
                         .controller(TickBoxControllerBuilder::create)
                         .build())
                     .build())

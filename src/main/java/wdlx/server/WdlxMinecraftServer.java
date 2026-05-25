@@ -154,6 +154,9 @@ public class WdlxMinecraftServer extends MinecraftServer {
     }
 
     public void writeClientChunk(LevelChunk chunk) {
+        if (Config.get().debug.logSavedChunks) {
+            LOGGER.info("Saving chunk {}", chunk.getPos());
+        }
         ServerLevel serverLevel = getLevel(chunk.getLevel().dimension());
         ServerLevelExt ext = (ServerLevelExt) serverLevel;
         ext.injectClientChunk(chunk);
@@ -161,6 +164,9 @@ public class WdlxMinecraftServer extends MinecraftServer {
 
     public void writeClientEntity(Entity entity) {
         if (!Config.get().download.entities.enabled) return;
+        if (Config.get().debug.logSavedEntities) {
+            LOGGER.info("Saving entity: {} ({}) [{}, {}, {}]", entity.getType(), entity.getId(), entity.getX(), entity.getY(), entity.getZ());
+        }
         ServerLevel serverLevel = getLevel(entity.level().dimension());
         ServerLevelExt ext = (ServerLevelExt) serverLevel;
         ext.injectClientEntity(entity);

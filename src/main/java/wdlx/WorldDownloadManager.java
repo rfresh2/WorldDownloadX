@@ -1,10 +1,12 @@
 package wdlx;
 
+import com.google.gson.GsonBuilder;
 import net.minecraft.client.Minecraft;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import wdlx.api.Session;
+import wdlx.config.Config;
 import wdlx.server.WdlxServerSession;
 
 public class WorldDownloadManager {
@@ -28,6 +30,9 @@ public class WorldDownloadManager {
 //        };
 
         LOGGER.info("Starting world download server");
+        if (Config.get().debug.logSettings) {
+            LOGGER.info("WDLX Settings: \n{}", new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create().toJson(Config.get(), Config.class));
+        }
         serverSession = new WdlxServerSession(name);
         status = DownloadStatus.STARTED;
     }
