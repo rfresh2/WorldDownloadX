@@ -4,12 +4,12 @@ import com.google.common.base.Stopwatch;
 import com.mojang.authlib.GameProfile;
 import com.mojang.authlib.yggdrasil.ServicesKeySet;
 import com.mojang.serialization.Lifecycle;
+import lombok.SneakyThrows;
 import net.minecraft.SystemReport;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.MappedRegistry;
-import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.Services;
@@ -25,15 +25,14 @@ import net.minecraft.util.debugchart.LocalSampleLogger;
 import net.minecraft.util.debugchart.SampleLogger;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.level.*;
 import net.minecraft.world.level.chunk.LevelChunk;
-import net.minecraft.world.level.dimension.LevelStem;
-import net.minecraft.world.level.levelgen.WorldDimensions;
 import net.minecraft.world.level.levelgen.WorldOptions;
 import net.minecraft.world.level.levelgen.presets.WorldPresets;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import net.minecraft.world.level.storage.PrimaryLevelData;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import wdlx.config.Config;
 import wdlx.ext.ServerLevelExt;
 
@@ -43,48 +42,71 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class WdlxMinecraftServer extends MinecraftServer {
-    private static final Services NO_SERVICES = new Services(null, ServicesKeySet.EMPTY, null, null);
-    private static final WorldOptions WORLD_OPTIONS = new WorldOptions(0L, false, false);
-    private static final GameRules TEST_GAME_RULES = Util.make(new GameRules(FeatureFlags.VANILLA_SET), gameRules -> {
-        gameRules.getRule(GameRules.RULE_DOMOBSPAWNING).set(false, null);
-        gameRules.getRule(GameRules.RULE_WEATHER_CYCLE).set(false, null);
-        gameRules.getRule(GameRules.RULE_RANDOMTICKING).set(0, null);
-        gameRules.getRule(GameRules.RULE_DOFIRETICK).set(false, null);
-    });
+    private static final Logger LOGGER = LoggerFactory.getLogger(WdlxServerSession.class);
 
-    public static WdlxMinecraftServer create(
+    private static final Services NO_SERVICES = new Services(null, ServicesKeySet.EMPTY, null, null);
+
+    @SneakyThrows
+    public static WdlxMinecraftServer startServer(String name) {
+        var mc = Minecraft.getInstance();
+        var levelStorageAccess = mc.getLevelSource().createAccess(name);
+        var server = MinecraftServer.spin((thread) -> {
+            var s = WdlxMinecraftServer.create(
+                thread,
+                levelStorageAccess,
+                mc.getResourcePackRepository()
+            );
+            LOGGER.info("World download server started");
+            return s;
+        });
+        return server;
+    }
+
+    static WdlxMinecraftServer create(
         final Thread thread,
         final LevelStorageSource.LevelStorageAccess levelStorageAccess,
         final PackRepository packRepository
     ) {
+        var mc = Minecraft.getInstance();
+
         // todo: inject client registry (synced from external server)
         //  client registries will still be missing server-side only data like worldgen params
         //  but main thing we need to match is the dimension registry
 
         // todo: alot of this async loading is prob unnecessary, copied from GameTestServer
         packRepository.reload();
-        WorldDataConfiguration worldDataConfiguration = new WorldDataConfiguration(
-            new DataPackConfig(new ArrayList(packRepository.getAvailableIds()), List.of()), FeatureFlags.REGISTRY.allFlags()
+        var worldDataConfiguration = new WorldDataConfiguration(
+            new DataPackConfig(new ArrayList(packRepository.getAvailableIds()), List.of()), mc.getConnection().enabledFeatures()
         );
-        LevelSettings levelSettings = new LevelSettings("World Download Level", GameType.CREATIVE, false, Difficulty.NORMAL, true, TEST_GAME_RULES, worldDataConfiguration);
-        WorldLoader.PackConfig packConfig = new WorldLoader.PackConfig(packRepository, worldDataConfiguration, false, true);
-        WorldLoader.InitConfig initConfig = new WorldLoader.InitConfig(packConfig, Commands.CommandSelection.DEDICATED, 4);
+        var serverGameRules = Util.make(new GameRules(mc.getConnection().enabledFeatures()), gameRules -> {
+            gameRules.getRule(GameRules.RULE_DOMOBSPAWNING).set(false, null);
+            gameRules.getRule(GameRules.RULE_WEATHER_CYCLE).set(false, null);
+            gameRules.getRule(GameRules.RULE_RANDOMTICKING).set(0, null);
+            gameRules.getRule(GameRules.RULE_DOFIRETICK).set(false, null);
+        });
+        var levelSettings = new LevelSettings("WDLX Level", GameType.CREATIVE, false, Difficulty.NORMAL, true, serverGameRules, worldDataConfiguration);
+        var packConfig = new WorldLoader.PackConfig(packRepository, worldDataConfiguration, false, true);
+        var initConfig = new WorldLoader.InitConfig(packConfig, Commands.CommandSelection.DEDICATED, 4);
 
         try {
-            Stopwatch stopwatch = Stopwatch.createStarted();
-            WorldStem worldStem = Util.blockUntilDone(
+            var stopwatch = Stopwatch.createStarted();
+            var worldStem = Util.blockUntilDone(
                     executor -> WorldLoader.load(
                         initConfig,
                         context -> {
-                            Registry<LevelStem> registry = new MappedRegistry<>(Registries.LEVEL_STEM, Lifecycle.stable()).freeze();
-                            WorldDimensions.Complete complete = context.datapackWorldgen()
+                            var registry = new MappedRegistry<>(Registries.LEVEL_STEM, Lifecycle.stable()).freeze();
+                            var complete = context.datapackWorldgen()
                                 .lookupOrThrow(Registries.WORLD_PRESET)
                                 .getOrThrow(WorldPresets.FLAT) // todo: what we really need is the flat world void preset
                                 .value()
                                 .createWorldDimensions()
                                 .bake(registry);
                             return new WorldLoader.DataLoadOutput<>(
-                                new PrimaryLevelData(levelSettings, WORLD_OPTIONS, complete.specialWorldProperty(), complete.lifecycle()), complete.dimensionsRegistryAccess()
+                                new PrimaryLevelData(
+                                    levelSettings,
+                                    new WorldOptions(0L, false, false),
+                                    complete.specialWorldProperty(),
+                                    complete.lifecycle()), complete.dimensionsRegistryAccess()
                             );
                         },
                         WorldStem::new,
@@ -140,7 +162,7 @@ public class WdlxMinecraftServer extends MinecraftServer {
         this.setPlayerList(new PlayerList(this, this.registries(), this.playerDataStorage, 1) {});
         getPlayerList().setViewDistance(Minecraft.getInstance().getConnection().serverChunkRadius);
         this.loadLevel();
-        ServerLevel serverLevel = getLevel(Minecraft.getInstance().level.dimension());
+        var serverLevel = getLevel(Minecraft.getInstance().level.dimension());
         return true;
     }
 
