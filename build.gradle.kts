@@ -1,6 +1,7 @@
+import net.fabricmc.loom.task.FabricModJsonV1Task
+
 plugins {
 	id("net.fabricmc.fabric-loom-remap") version "1.16-SNAPSHOT"
-	`maven-publish`
 }
 
 version = providers.gradleProperty("mod_version").get()
@@ -8,8 +9,8 @@ group = providers.gradleProperty("maven_group").get()
 val mc = providers.gradleProperty("minecraft_version").get()
 val loader = providers.gradleProperty("loader_version").get()
 val fabricApi = providers.gradleProperty("fabric_api_version").get()
-val yacl = property("yacl_version") as String
-val modmenu = property("modmenu_version") as String
+val yacl = providers.gradleProperty("yacl_version").get()
+val modmenu = providers.gradleProperty("modmenu_version").get()
 
 java {
 	toolchain {
@@ -54,14 +55,6 @@ dependencies {
 }
 
 tasks {
-	processResources {
-		val version = version
-		inputs.property("version", version)
-
-		filesMatching("fabric.mod.json") {
-			expand("version" to version)
-		}
-	}
 	jar {
 		val projectName = project.name
 		archiveVersion = "$version+fabric-$mc"
@@ -71,16 +64,36 @@ tasks {
 			rename { "${it}_$projectName" }
 		}
 	}
-}
-
-// configure the maven publication
-publishing {
-	publications {
-		register<MavenPublication>("mavenJava") {
-			from(components["java"])
+	val fmjTask = register<FabricModJsonV1Task>("createModJson") {
+		group = "fabric"
+		outputFile = file(project.layout.buildDirectory.file("resources/main/fabric.mod.json").get().asFile)
+		json {
+			modId = "wdlx"
+			version = project.version as String
+			name = "WorldDownloadX"
+			description = "Download multiplayer worlds into a singleplayer world"
+			author("rfresh2")
+			contactInformation.put("homepage", "https://github.com/rfresh2/WorldDownloadX")
+			contactInformation.put("sources", "https://github.com/rfresh2/WorldDownloadX")
+			licenses.add("LGPL-3.0")
+			icon {
+				path = "assets/wdlx/icon.png"
+			}
+			client()
+			entrypoint("client", "wdlx.WorldDownloadX")
+			entrypoint("modmenu", "wdlx.config.ModMenuScreen")
+			mixin {
+				environment = "client"
+				value = "wdlx.mixins.json"
+			}
+			depends("fabricloader", ">=0.19.2")
+			depends("minecraft", "1.21.4")
+			depends("fabric-api", "*")
+			depends("yet_another_config_lib_v3", "*")
+			accessWidener = loom.accessWidenerPath.get().asFile.name
 		}
 	}
-	repositories {
-
+	processResources {
+		dependsOn(fmjTask)
 	}
 }
