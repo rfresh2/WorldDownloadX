@@ -86,6 +86,9 @@ public class WdlxServerSession implements AutoCloseable, Session {
         for (var i = 0; i < mc.player.getEnderChestInventory().items.size(); i++) {
             serverPlayer.getEnderChestInventory().items.set(i, mc.player.getEnderChestInventory().items.get(i).copy());
         }
+        serverPlayer.setPos(mc.player.position());
+        serverPlayer.setXRot(mc.player.getXRot());
+        serverPlayer.setYRot(mc.player.getYRot());
         return serverPlayer;
     }
 

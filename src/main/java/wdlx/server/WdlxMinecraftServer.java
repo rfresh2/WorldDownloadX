@@ -27,7 +27,9 @@ import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.*;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.levelgen.FlatLevelSource;
 import net.minecraft.world.level.levelgen.WorldOptions;
+import net.minecraft.world.level.levelgen.flat.FlatLevelGeneratorPresets;
 import net.minecraft.world.level.levelgen.presets.WorldPresets;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import net.minecraft.world.level.storage.PrimaryLevelData;
@@ -50,8 +52,9 @@ public class WdlxMinecraftServer extends MinecraftServer {
     public static WdlxMinecraftServer startServer(String name) {
         var mc = Minecraft.getInstance();
         var levelStorageAccess = mc.getLevelSource().createAccess(name);
-        var server = MinecraftServer.spin((thread) -> {
+        return MinecraftServer.spin((thread) -> {
             var s = WdlxMinecraftServer.create(
+                name,
                 thread,
                 levelStorageAccess,
                 mc.getResourcePackRepository()
@@ -59,13 +62,13 @@ public class WdlxMinecraftServer extends MinecraftServer {
             LOGGER.info("World download server started");
             return s;
         });
-        return server;
     }
 
     static WdlxMinecraftServer create(
-        final Thread thread,
-        final LevelStorageSource.LevelStorageAccess levelStorageAccess,
-        final PackRepository packRepository
+        String name,
+        Thread thread,
+        LevelStorageSource.LevelStorageAccess levelStorageAccess,
+        PackRepository packRepository
     ) {
         var mc = Minecraft.getInstance();
 
@@ -74,7 +77,6 @@ public class WdlxMinecraftServer extends MinecraftServer {
         //  but main thing we need to match is the dimension registry
 
         // todo: alot of this async loading is prob unnecessary, copied from GameTestServer
-        packRepository.reload();
         var worldDataConfiguration = new WorldDataConfiguration(
             new DataPackConfig(new ArrayList(packRepository.getAvailableIds()), List.of()), mc.getConnection().enabledFeatures()
         );
@@ -84,7 +86,7 @@ public class WdlxMinecraftServer extends MinecraftServer {
             gameRules.getRule(GameRules.RULE_RANDOMTICKING).set(0, null);
             gameRules.getRule(GameRules.RULE_DOFIRETICK).set(false, null);
         });
-        var levelSettings = new LevelSettings("WDLX Level", GameType.CREATIVE, false, Difficulty.NORMAL, true, serverGameRules, worldDataConfiguration);
+        var levelSettings = new LevelSettings(name, GameType.CREATIVE, false, Difficulty.NORMAL, true, serverGameRules, worldDataConfiguration);
         var packConfig = new WorldLoader.PackConfig(packRepository, worldDataConfiguration, false, true);
         var initConfig = new WorldLoader.InitConfig(packConfig, Commands.CommandSelection.DEDICATED, 4);
 
@@ -95,11 +97,18 @@ public class WdlxMinecraftServer extends MinecraftServer {
                         initConfig,
                         context -> {
                             var registry = new MappedRegistry<>(Registries.LEVEL_STEM, Lifecycle.stable()).freeze();
-                            var complete = context.datapackWorldgen()
+                            var worldgen = context.datapackWorldgen();
+                            var voidSettings = worldgen
+                                .lookupOrThrow(Registries.FLAT_LEVEL_GENERATOR_PRESET)
+                                .getOrThrow(FlatLevelGeneratorPresets.THE_VOID)
+                                .value()
+                                .settings();
+                            var complete = worldgen
                                 .lookupOrThrow(Registries.WORLD_PRESET)
-                                .getOrThrow(WorldPresets.FLAT) // todo: what we really need is the flat world void preset
+                                .getOrThrow(WorldPresets.FLAT)
                                 .value()
                                 .createWorldDimensions()
+                                .replaceOverworldGenerator(worldgen, new FlatLevelSource(voidSettings))
                                 .bake(registry);
                             return new WorldLoader.DataLoadOutput<>(
                                 new PrimaryLevelData(
