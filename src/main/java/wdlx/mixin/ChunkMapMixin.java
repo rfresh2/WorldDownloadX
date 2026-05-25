@@ -30,9 +30,4 @@ public class ChunkMapMixin {
         }
         return original.call(instance, worldGenContext, cache, chunk);
     }
-
-    // todo: look into what changes may be needed to ignore writing region files for our transient empty chunks
-//    @Inject(method = "save", at = @At(
-//        value = ""
-//    ))
 }

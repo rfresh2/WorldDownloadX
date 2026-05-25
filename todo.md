@@ -1,12 +1,10 @@
 ### Entities
 
-currently only saves entities that are loaded when the WDL is stopped.
-
-edge cases:
+edge cases that need testing:
 - varying entity unload distances
 - differentiate entity being killed and unloaded (we want to save unloaded)
-- revisiting entities, need to identify by uuid and not dupe even when they moved chunks
-- need to remove disk entity chunk if it previously had entities but now doesn't
+- revisiting entities
+- should remove entity chunk if it previously had entities but now doesn't
 
 ### Block Entities & Containers
 
@@ -18,13 +16,9 @@ e.g. chests, shulkers, lectern, etc.
 
 need to capture contents when opened ingame
 
-iirc needs to be saved to the playerdata file
-
 ### Maps
 
-cached by vanilla client already
-
-just need to track which we actually see during the wdl and then only save those
+need to track which we actually see during the wdl and then only save those
 
 ### Player Statistics
 
@@ -46,11 +40,17 @@ carefully decide what actions can be done off the render thread
 
 client level access is not thread safe
 
-in some cases, could be beneficial to create a copy of data on the render thread and send that offthread
+if copying is less costly than in-thread operations, could be worth it to create a copy of data on the render thread and send that offthread
 
 main thing we want to avoid is unnecessary freezes when too much work is done per frame
 
 so if the client level is not in a state change, it is acceptable to only split up work across multiple frames, which will minimize freezes
+
+### Dimension Switches
+
+continue world download when switching dimensions
+
+but should still stop world download automatically if we exit the server (switch to null dimension)
 
 ### Container ESP
 
@@ -67,10 +67,6 @@ in-game hud showing download progress
 ### Download Statistics
 
 track what data has been downloaded
-
-### Download Start Button
-
-in-game button on pause screen window to start download
 
 ### Save Browser GUI
 
@@ -100,7 +96,7 @@ will use same maintainence strategy as XaeroPlus:
 
 ### NeoForge
 
-low priority, might not do this.
+low priority
 
 would need more testing for compatibility with modpacks. otherwise this is mostly useless
 
