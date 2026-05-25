@@ -44,6 +44,7 @@ dependencies {
 	modImplementation("net.fabricmc:fabric-loader:$loader")
 	modImplementation("net.fabricmc.fabric-api:fabric-api:$fabricApi")
 	implementation(include("net.lenni0451:LambdaEvents:2.4.2")!!)
+	implementation(include("net.lenni0451:Reflect:1.6.3")!!)
 
 	modImplementation("maven.modrinth:modmenu:$modmenu")
 	modImplementation("dev.isxander:yet-another-config-lib:$yacl+$mc-fabric")

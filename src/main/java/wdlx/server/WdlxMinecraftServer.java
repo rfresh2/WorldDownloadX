@@ -24,6 +24,7 @@ import net.minecraft.util.datafix.DataFixers;
 import net.minecraft.util.debugchart.LocalSampleLogger;
 import net.minecraft.util.debugchart.SampleLogger;
 import net.minecraft.world.Difficulty;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.level.*;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -33,6 +34,7 @@ import net.minecraft.world.level.levelgen.WorldOptions;
 import net.minecraft.world.level.levelgen.presets.WorldPresets;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import net.minecraft.world.level.storage.PrimaryLevelData;
+import wdlx.config.Config;
 import wdlx.ext.ServerLevelExt;
 
 import java.io.IOException;
@@ -58,11 +60,13 @@ public class WdlxMinecraftServer extends MinecraftServer {
         // todo: inject client registry (synced from external server)
         //  client registries will still be missing server-side only data like worldgen params
         //  but main thing we need to match is the dimension registry
+
+        // todo: alot of this async loading is prob unnecessary, copied from GameTestServer
         packRepository.reload();
         WorldDataConfiguration worldDataConfiguration = new WorldDataConfiguration(
             new DataPackConfig(new ArrayList(packRepository.getAvailableIds()), List.of()), FeatureFlags.REGISTRY.allFlags()
         );
-        LevelSettings levelSettings = new LevelSettings("Test Level", GameType.CREATIVE, false, Difficulty.NORMAL, true, TEST_GAME_RULES, worldDataConfiguration);
+        LevelSettings levelSettings = new LevelSettings("World Download Level", GameType.CREATIVE, false, Difficulty.NORMAL, true, TEST_GAME_RULES, worldDataConfiguration);
         WorldLoader.PackConfig packConfig = new WorldLoader.PackConfig(packRepository, worldDataConfiguration, false, true);
         WorldLoader.InitConfig initConfig = new WorldLoader.InitConfig(packConfig, Commands.CommandSelection.DEDICATED, 4);
 
@@ -75,7 +79,7 @@ public class WdlxMinecraftServer extends MinecraftServer {
                             Registry<LevelStem> registry = new MappedRegistry<>(Registries.LEVEL_STEM, Lifecycle.stable()).freeze();
                             WorldDimensions.Complete complete = context.datapackWorldgen()
                                 .lookupOrThrow(Registries.WORLD_PRESET)
-                                .getOrThrow(WorldPresets.FLAT)
+                                .getOrThrow(WorldPresets.FLAT) // todo: what we really need is the flat world void preset
                                 .value()
                                 .createWorldDimensions()
                                 .bake(registry);
@@ -124,12 +128,19 @@ public class WdlxMinecraftServer extends MinecraftServer {
         ext.injectClientChunk(chunk);
     }
 
+    public void writeClientEntity(Entity entity) {
+        if (!Config.get().download.entities.enabled) return;
+        ServerLevel serverLevel = getLevel(entity.level().dimension());
+        ServerLevelExt ext = (ServerLevelExt) serverLevel;
+        ext.injectClientEntity(entity);
+    }
+
     @Override
     protected boolean initServer() throws IOException {
         this.setPlayerList(new PlayerList(this, this.registries(), this.playerDataStorage, 1) {});
         getPlayerList().setViewDistance(Minecraft.getInstance().getConnection().serverChunkRadius);
         this.loadLevel();
-        ServerLevel serverLevel = this.overworld();
+        ServerLevel serverLevel = getLevel(Minecraft.getInstance().level.dimension());
         return true;
     }
 
