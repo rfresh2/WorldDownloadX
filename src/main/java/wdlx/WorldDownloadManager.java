@@ -14,6 +14,16 @@ public class WorldDownloadManager {
     private DownloadStatus status = DownloadStatus.STOPPED;
     private WdlxServerSession serverSession;
 
+    public synchronized void start() {
+        var mc = Minecraft.getInstance();
+        String name = "World Download";
+        var serverData = mc.getConnection().getServerData();
+        if (serverData != null) {
+            name = serverData.name;
+        }
+        start(name);
+    }
+
     public synchronized void start(String name) {
         if (status != DownloadStatus.STOPPED) {
             LOGGER.error("World download already in progress");

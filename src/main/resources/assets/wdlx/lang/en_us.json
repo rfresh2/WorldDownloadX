@@ -19,5 +19,7 @@
   "wdlx.config.debug.logSavedEntities": "Log Saved Entities",
   "wdlx.config.debug.logSavedPlayers": "Log Saved Players",
   "wdlx.config.debug.logSavedStatistics": "Log Saved Statistics",
-  "wdlx.config.debug.logSavedMaps": "Log Saved Maps"
+  "wdlx.config.debug.logSavedMaps": "Log Saved Maps",
+  "wdlx.gui.pause.toggle.start": "Download World",
+  "wdlx.gui.pause.toggle.stop": "Stop World Download"
 }

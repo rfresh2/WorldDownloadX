@@ -8,6 +8,7 @@
 		"ClientPacketListenerMixin",
 		"EntityMixin",
 		"MinecraftMixin",
+		"PauseScreenMixin",
 		"ServerLevelMixin",
 		"WorldOpenFlowsMixin"
 	],
