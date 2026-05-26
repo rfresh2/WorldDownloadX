@@ -37,38 +37,48 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import wdlx.config.Config;
 import wdlx.ext.ServerLevelExt;
+import wdlx.util.Wait;
 
 import java.io.IOException;
 import java.net.Proxy;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.regex.Pattern;
 
 public class WdlxMinecraftServer extends MinecraftServer {
     private static final Logger LOGGER = LoggerFactory.getLogger(WdlxServerSession.class);
 
     private static final Services NO_SERVICES = new Services(null, ServicesKeySet.EMPTY, null, null);
+    private final WdlxSessionTracker tracker;
 
     @SneakyThrows
-    public static WdlxMinecraftServer startServer(String name) {
+    public static WdlxMinecraftServer startServer(String name, WdlxSessionTracker tracker) {
         var mc = Minecraft.getInstance();
         var levelStorageAccess = mc.getLevelSource().createAccess(name);
-        return MinecraftServer.spin((thread) -> {
+        var server = MinecraftServer.spin((thread) -> {
             var s = WdlxMinecraftServer.create(
                 name,
                 thread,
                 levelStorageAccess,
-                mc.getResourcePackRepository()
+                mc.getResourcePackRepository(),
+                tracker
             );
             LOGGER.info("World download server started");
             return s;
         });
+        Wait.waitUntil(server::isReady, 5);
+        return server;
     }
 
     static WdlxMinecraftServer create(
         String name,
         Thread thread,
         LevelStorageSource.LevelStorageAccess levelStorageAccess,
-        PackRepository packRepository
+        PackRepository packRepository,
+        final WdlxSessionTracker tracker
     ) {
         var mc = Minecraft.getInstance();
 
@@ -130,7 +140,8 @@ public class WdlxMinecraftServer extends MinecraftServer {
                 levelStorageAccess,
                 packRepository,
                 worldStem,
-                i -> LoggerChunkProgressListener.createCompleted()
+                i -> LoggerChunkProgressListener.createCompleted(),
+                tracker
             );
         } catch (Exception e) {
             throw new IllegalStateException();
@@ -141,7 +152,8 @@ public class WdlxMinecraftServer extends MinecraftServer {
         final LevelStorageSource.LevelStorageAccess levelStorageAccess,
         final PackRepository packRepository,
         final WorldStem worldStem,
-        final ChunkProgressListenerFactory chunkProgressListenerFactory
+        final ChunkProgressListenerFactory chunkProgressListenerFactory,
+        final WdlxSessionTracker tracker
     ) {
         super(thread,
             levelStorageAccess,
@@ -151,6 +163,7 @@ public class WdlxMinecraftServer extends MinecraftServer {
             DataFixers.getDataFixer(),
             NO_SERVICES,
             chunkProgressListenerFactory);
+        this.tracker = tracker;
     }
 
     public void writeClientChunk(LevelChunk chunk) {
@@ -160,6 +173,7 @@ public class WdlxMinecraftServer extends MinecraftServer {
         ServerLevel serverLevel = getLevel(chunk.getLevel().dimension());
         ServerLevelExt ext = (ServerLevelExt) serverLevel;
         ext.injectClientChunk(chunk);
+        tracker.addNewlySavedChunk(chunk.getPos().toLong());
     }
 
     public void writeClientEntity(Entity entity) {
@@ -170,6 +184,7 @@ public class WdlxMinecraftServer extends MinecraftServer {
         ServerLevel serverLevel = getLevel(entity.level().dimension());
         ServerLevelExt ext = (ServerLevelExt) serverLevel;
         ext.injectClientEntity(entity);
+        tracker.addSavedEntity(entity.getUUID());
     }
 
     @Override
@@ -178,7 +193,63 @@ public class WdlxMinecraftServer extends MinecraftServer {
         getPlayerList().setViewDistance(Minecraft.getInstance().getConnection().serverChunkRadius);
         this.loadLevel();
         var serverLevel = getLevel(Minecraft.getInstance().level.dimension());
+        submit(this::syncSavedChunkTracker); // todo: lazily compute only if requested by api
         return true;
+    }
+
+    void syncSavedChunkTracker() {
+        var regionFileRegex = Pattern.compile("^r\\.(-?[0-9]+)\\.(-?[0-9]+)\\.mca$");
+        getAllLevels().forEach(level -> {
+            try {
+                var regionFilesPath = level.getChunkSource().chunkMap.worker.storage.folder;
+                if (!regionFilesPath.toFile().exists()) return;
+                Files.list(regionFilesPath)
+                    .filter(Files::isRegularFile)
+                    .filter(p -> p.toFile().getName().endsWith(".mca"))
+                    .forEach(p -> {
+                        var file = p.toFile();
+                        var matcher = regionFileRegex.matcher(file.getName());
+                        if (matcher.matches()) {
+                            var futures = new ArrayList<CompletableFuture<Void>>();
+                            int regionX = Integer.parseInt(matcher.group(1));
+                            int regionZ = Integer.parseInt(matcher.group(2));
+                            int minChunkX = regionX << 5;
+                            int minChunkZ = regionZ << 5;
+                            // todo: this can probably be optimized
+                            for (int x = minChunkX; x < minChunkX + 32; x++) {
+                                for (int z = minChunkZ; z < minChunkZ + 32; z++) {
+                                    if (level.getChunkSource().hasChunk(x, z)) {
+                                        tracker.addSavedChunk(x, z);
+                                        continue;
+                                    }
+                                    if (isEmptyFile(p)) continue;
+                                    final var fx = x;
+                                    final var fz = z;
+                                    var future = level.getChunkSource().chunkMap.read(new ChunkPos(x, z))
+                                        .thenAccept(optionalTag -> {
+                                            if (optionalTag.isPresent()) {
+                                                tracker.addSavedChunk(ChunkPos.asLong(fx, fz));
+                                            }
+                                        });
+                                    futures.add(future);
+                                }
+                            }
+                            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+                        }
+                    });
+            } catch (Exception e) {
+                LOGGER.error("failed retrieving saved chunks", e);
+            }
+        });
+    }
+
+    boolean isEmptyFile(Path path) {
+        try {
+            return Files.size(path) == 0;
+        } catch (IOException e) {
+            LOGGER.warn("Failed to inspect region file {}", path, e);
+            return false;
+        }
     }
 
     @Override

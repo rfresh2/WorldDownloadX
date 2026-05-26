@@ -4,6 +4,7 @@
 	"compatibilityLevel": "JAVA_21",
 	"mixins": [
 		"ChunkMapMixin",
+		"ClientChunkCacheMixin",
 		"ClientLevelMixin",
 		"ClientPacketListenerMixin",
 		"EntityMixin",

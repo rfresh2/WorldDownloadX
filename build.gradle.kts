@@ -2,6 +2,7 @@ import net.fabricmc.loom.task.FabricModJsonV1Task
 
 plugins {
 	id("net.fabricmc.fabric-loom-remap") version "1.16-SNAPSHOT"
+	`maven-publish`
 }
 
 version = providers.gradleProperty("mod_version").get()
@@ -34,7 +35,7 @@ loom {
 	runs {
 		getByName("client") {
 			client()
-			programArgs("--username", "test")
+			programArgs("--username", "wdlx")
 		}
 	}
 }
@@ -112,5 +113,21 @@ tasks {
 	}
 	processResources {
 		dependsOn(fmjTask)
+	}
+	withType<JavaCompile> {
+		options.encoding = "UTF-8"
+		options.release = java.toolchain.languageVersion.get().asInt()
+		options.compilerArgs.add("-parameters")
+	}
+}
+
+publishing {
+	publications {
+		register<MavenPublication>("mavenJava") {
+			from(components["java"])
+		}
+	}
+	repositories {
+
 	}
 }

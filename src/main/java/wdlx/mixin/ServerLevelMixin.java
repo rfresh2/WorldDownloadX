@@ -20,6 +20,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import wdlx.ext.ServerLevelExt;
 import wdlx.server.WdlxMinecraftServer;
+import wdlx.util.ClientTickTaskExecutor;
 
 import java.util.function.BooleanSupplier;
 
@@ -55,29 +56,33 @@ public abstract class ServerLevelMixin implements ServerLevelExt {
     @Override
     public void injectClientChunk(LevelChunk chunk) {
         getChunkSource().getChunkFuture(chunk.getPos().x, chunk.getPos().z, ChunkStatus.FULL, true)
-            .thenAccept(serverChunkResult -> {
+            .whenComplete((serverChunkResult, throwable) -> {
+//                LOGGER.info("Injecting chunk {}", chunk.getPos());
                 var serverChunk = serverChunkResult.orElseThrow(() -> new RuntimeException("Failed to get server chunk"));
-                RStream.of(ChunkAccess.class, serverChunk)
-                    .fields()
-                    .filterStatic(false)
-                    .forEach(field -> {
-                        field.set(serverChunk, field.get(chunk));
-                    });
+                ClientTickTaskExecutor.INSTANCE.executeBlocking(() -> {
+                    RStream.of(ChunkAccess.class, serverChunk)
+                        .fields()
+                        .filterStatic(false)
+                        .forEach(field -> {
+                            field.set(serverChunk, field.get(chunk));
+                        });
+                });
                 serverChunk.markUnsaved();
             });
     }
 
-    // todo: need special handling for players i think
     @Override
     public void injectClientEntity(Entity entity) {
         var entityCopy = Objects.allocate(entity.getClass());
-        RStream.of(entity)
-            .withSuper()
-            .fields()
-            .filterStatic(false)
-            .forEach(field -> {
-                field.copy(entityCopy);
-            });
+        ClientTickTaskExecutor.INSTANCE.executeBlocking(() -> {
+            RStream.of(entity)
+                .withSuper()
+                .fields()
+                .filterStatic(false)
+                .forEach(field -> {
+                    field.copy(entityCopy);
+                });
+        });
         RStream.of(entityCopy)
             .withSuper()
             .fields()

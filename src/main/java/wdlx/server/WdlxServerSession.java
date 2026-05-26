@@ -1,7 +1,6 @@
 package wdlx.server;
 
 import io.netty.channel.embedded.EmbeddedChannel;
-import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import net.lenni0451.lambdaevents.EventHandler;
 import net.minecraft.client.Minecraft;
@@ -10,32 +9,32 @@ import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.CommonListenerCookie;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.storage.LevelResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import wdlx.WorldDownloadX;
 import wdlx.api.Session;
 import wdlx.config.Config;
+import wdlx.events.ChunkLoadEvent;
 import wdlx.events.ChunkUnloadEvent;
 import wdlx.events.EntityUnloadEvent;
 import wdlx.events.LevelChangeEvent;
 import wdlx.util.Notifications;
+import wdlx.util.Wait;
+import xaeroplus.module.impl.TickTaskExecutor;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.regex.Pattern;
 
 public class WdlxServerSession implements AutoCloseable, Session {
     private static final Logger LOGGER = LoggerFactory.getLogger(WdlxServerSession.class);
     final String name;
     final WdlxMinecraftServer server;
     final Minecraft mc = Minecraft.getInstance();
+    final WdlxSessionTracker tracker = new WdlxSessionTracker();
 
     public WdlxServerSession(String name) {
         var mc = Minecraft.getInstance();
@@ -43,9 +42,17 @@ public class WdlxServerSession implements AutoCloseable, Session {
             throw new IllegalStateException("Can't start WDLX server if client not connected");
         }
         this.name = name;
-        this.server = WdlxMinecraftServer.startServer(name);
-        WorldDownloadX.EVENT_BUS.register(this);
-        Notifications.chat("WDL Started");
+        // todo: async start
+        //  but need to be careful about control state management
+        //  i.e. only one wdl server at a time
+        this.server = WdlxMinecraftServer.startServer(name, tracker);
+        CompletableFuture.runAsync(() -> {
+            Wait.waitUntil(server::isReady, 5);
+            WorldDownloadX.EVENT_BUS.register(this);
+            Notifications.chat("WDL Started");
+        }).thenAcceptAsync(v -> {
+            flushLoadedChunks();
+        }, TickTaskExecutor.INSTANCE);
     }
 
     @Override
@@ -61,14 +68,16 @@ public class WdlxServerSession implements AutoCloseable, Session {
             LOGGER.error("Failed to close WdlServerSession", e);
             Notifications.chatError("Error while saving world: " + e.getMessage());
         }
-        server.executeBlocking(() -> {
+        // todo: return the completablefuture
+        server.submit(() -> {
             server.saveEverything(false, true, true);
-        });
-        var worldPath = server.getWorldPath(LevelResource.ROOT);
-        server.halt(true);
-        cleanupEmptyRegionFiles(worldPath);
-        LOGGER.info("Stopped WdlServerSession");
-        Notifications.chat("WDL Stopped");
+        }).thenAcceptAsync(s -> {
+            var worldPath = server.getWorldPath(LevelResource.ROOT);
+            server.halt(true);
+            cleanupEmptyRegionFiles(worldPath);
+            LOGGER.info("Stopped WdlServerSession");
+            Notifications.chat("WDL Stopped");
+        }, TickTaskExecutor.INSTANCE);
     }
 
     void cleanupEmptyRegionFiles(Path worldPath) {
@@ -134,7 +143,7 @@ public class WdlxServerSession implements AutoCloseable, Session {
         if (Config.get().debug.logSavedPlayers) {
             LOGGER.info("Saving player: {} ({}) [{}, {}, {}]", mc.player.getGameProfile(), mc.player.getId(), mc.player.getX(), mc.player.getY(), mc.player.getZ());
         }
-        createPlayerDupe();
+        server.execute(this::createPlayerDupe);
     }
 
     // todo: track which maps we encounter during the wdl and only flush those
@@ -160,7 +169,7 @@ public class WdlxServerSession implements AutoCloseable, Session {
             for (int z = centerZ - serverChunkRadius; z <= centerZ + serverChunkRadius; z++) {
                 var chunk = level.getChunkSource().getChunk(x, z, false);
                 if (chunk != null) {
-                    server.writeClientChunk(chunk);
+                    server.execute(() -> server.writeClientChunk(chunk));
                     count++;
                 }
             }
@@ -172,7 +181,7 @@ public class WdlxServerSession implements AutoCloseable, Session {
         AtomicInteger count = new AtomicInteger();
         mc.level.entitiesForRendering().forEach(entity -> {
             if (entity instanceof Player) return;
-            server.writeClientEntity(entity);
+            server.execute(() -> server.writeClientEntity(entity));
             count.incrementAndGet();
         });
         LOGGER.info("Flushed {} entities", count.get());
@@ -186,14 +195,19 @@ public class WdlxServerSession implements AutoCloseable, Session {
     }
 
     @EventHandler
+    public void handleChunkLoad(ChunkLoadEvent event) {
+        server.execute(() -> server.writeClientChunk(event.chunk()));
+    }
+
+    @EventHandler
     public void handleChunkUnload(ChunkUnloadEvent event) {
-        server.writeClientChunk(event.chunk());
+        server.execute(() -> server.writeClientChunk(event.chunk()));
     }
 
     @EventHandler
     public void handleEntityUnload(EntityUnloadEvent event) {
         if (event.reason().shouldSave()) {
-            server.writeClientEntity(event.entity());
+            server.execute(() -> server.writeClientEntity(event.entity()));
         }
     }
 
@@ -204,46 +218,11 @@ public class WdlxServerSession implements AutoCloseable, Session {
 
     @Override
     public CompletableFuture<LongSet> savedChunks() {
-        // todo: highly cacheable if we track which chunks we save afterwards and increment
-        return CompletableFuture.supplyAsync(() -> {
-            var regionFileRegex = Pattern.compile("^r\\.(-?[0-9]+)\\.(-?[0-9]+)\\.mca$");
-            var set = new LongOpenHashSet();
-            server.getAllLevels().forEach(level -> {
-                try {
-                    var regionFilesPath = level.getChunkSource().chunkMap.worker.storage.folder;
-                    Files.list(regionFilesPath)
-                        .filter(p -> p.endsWith(".mca"))
-                        .forEach(p -> {
-                            var file = p.toFile();
-                            var matcher = regionFileRegex.matcher(file.getName());
-                            if (matcher.matches()) {
-                                var futures = new ArrayList<CompletableFuture<Void>>();
-                                int regionX = Integer.parseInt(matcher.group(1));
-                                int regionZ = Integer.parseInt(matcher.group(2));
-                                int minChunkX = regionX << 5;
-                                int minChunkZ = regionZ << 5;
-                                // todo: this can probably be optimized
-                                for (int x = minChunkX; x < minChunkX + 32; x++) {
-                                    for (int z = minChunkZ; z < minChunkZ + 32; z++) {
-                                        var future = level.getChunkSource().getChunkFuture(x, z, ChunkStatus.FULL, false)
-                                            .thenAccept(chunkResult -> {
-                                                chunkResult.ifSuccess(chunk -> {
-                                                    synchronized (set) {
-                                                        set.add(ChunkPos.asLong(chunk.getPos().x, chunk.getPos().z));
-                                                    }
-                                                });
-                                            });
-                                        futures.add(future);
-                                    }
-                                }
-                                CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
-                            }
-                        });
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
-            });
-            return set;
-        }, server);
+        return CompletableFuture.supplyAsync(tracker::getSavedChunks, server);
+    }
+
+    @Override
+    public CompletableFuture<LongSet> newlySavedChunks() {
+        return CompletableFuture.supplyAsync(tracker::getNewlySavedChunks, server);
     }
 }

@@ -7,3 +7,4 @@ transitive-accessible field net/minecraft/client/multiplayer/ClientLevel mapData
 transitive-accessible field net/minecraft/world/level/chunk/storage/ChunkStorage worker Lnet/minecraft/world/level/chunk/storage/IOWorker;
 transitive-accessible field net/minecraft/world/level/chunk/storage/IOWorker storage Lnet/minecraft/world/level/chunk/storage/RegionFileStorage;
 transitive-accessible field net/minecraft/world/level/chunk/storage/RegionFileStorage folder Ljava/nio/file/Path;
+transitive-accessible class net/minecraft/client/multiplayer/ClientChunkCache$Storage
