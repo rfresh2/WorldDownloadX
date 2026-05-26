@@ -22,6 +22,7 @@ java {
 repositories {
 	maven("https://maven.fabricmc.net/")
 	maven("https://maven.2b2t.vc/remote")
+	maven("https://maven.2b2t.vc/xaero")
 	maven("https://api.modrinth.com/maven") {
 		content {
 			includeGroup("maven.modrinth")
@@ -67,6 +68,11 @@ dependencies {
 
 	modImplementation("maven.modrinth:modmenu:$modmenu")
 	modImplementation("dev.isxander:yet-another-config-lib:$yacl+$mc-fabric")
+
+	modRuntimeOnly("maven.modrinth:xaeros-world-map:fabric-1.21.4-1.40.16")
+	modRuntimeOnly("maven.modrinth:xaeros-minimap:fabric-1.21.4-25.3.12")
+	modRuntimeOnly("xaero.lib:xaerolib-fabric-1.21.4:1.1.15")
+	modImplementation("maven.modrinth:xaeroplus:2.31.5+fabric-1.21.4")
 
 	compileOnly("org.projectlombok:lombok:1.18.46")
 	annotationProcessor("org.projectlombok:lombok:1.18.46")

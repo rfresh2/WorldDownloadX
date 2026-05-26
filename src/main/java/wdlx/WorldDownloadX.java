@@ -7,6 +7,7 @@ import net.lenni0451.lambdaevents.generator.LambdaMetaFactoryGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import wdlx.api.impl.WdlxApiInstance;
+import wdlx.util.XaeroPlusIntegration;
 
 public class WorldDownloadX implements ClientModInitializer {
 	public static final String MOD_ID = "wdlx";
@@ -18,5 +19,6 @@ public class WorldDownloadX implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
 		ClientCommandRegistrationCallback.EVENT.register(CommandManager::registerCommands);
+		XaeroPlusIntegration.init();
 	}
 }
